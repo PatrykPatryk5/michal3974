@@ -5,11 +5,11 @@
   "main": "index.js",
   "dependencies": {
     "@discordjs/voice": "^0.18.0",
-    "@distube/ytdl-core": "^4.15.9",
+    "@distube/ytdl-core": "^4.16.12",
     "@napi-rs/canvas": "^0.1.65",
     "axios": "^1.7.9",
     "better-sqlite3": "^11.8.1",
-    "discord.js": "^14.17.3",
+    "discord.js": "^14.24.2",
     "dotenv": "^16.4.7",
     "glob": "^11.0.1",
     "libsodium-wrappers": "^0.7.15",
