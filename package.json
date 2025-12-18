@@ -4,7 +4,7 @@
   "description": "POLSKI bot discord",
   "main": "index.js",
   "dependencies": {
-    "@discordjs/voice": "^0.17.0",
+    "@discordjs/voice": "^0.19.0",
     "@distube/ytdl-core": "^4.14.4",
     "@napi-rs/canvas": "^0.1.53",
     "axios": "^1.7.2",
