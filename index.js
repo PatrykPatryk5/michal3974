@@ -9,6 +9,7 @@ const {
 } = require("discord.js");
 const fs = require("fs");
 const loadSlashCommands = require("./functions/settings/loadSlashCommands");
+const logger = require("./functions/logger");
 
 const client = new Client({
   intents: [
@@ -34,11 +35,15 @@ const client = new Client({
 const eventFiles = fs.readdirSync("./events/").filter(f => f.endsWith(".js"));
 
 for (const file of eventFiles) {
-  const event = require(`./events/${file}`);
-  if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args, client));
-  } else {
-    client.on(event.name, (...args) => event.execute(...args, client));
+  try {
+    const event = require(`./events/${file}`);
+    if (event.once) {
+      client.once(event.name, (...args) => event.execute(...args, client));
+    } else {
+      client.on(event.name, (...args) => event.execute(...args, client));
+    }
+  } catch (err) {
+    logger.error(`Failed loading event file ./events/${file}:`, err.stack || err);
   }
 }
 
@@ -54,21 +59,29 @@ client.inactivity = new Collection();
 client.invites = new Collection();
 client.modals = new Collection();
 
-loadSlashCommands(client);
-// log(client.slashCommands.get('ping'));
-// console.log([...client.slashCommands.entries()]);
-// for (const [key, { data }] of client.slashCommands) {
-//   console.log(`${key} goes ${data.description}`);
-// }
+// Load interaction handlers and command data before logging in to avoid race with ready
+// Await the loader so `events/ready` can safely register commands on ready
+(async () => {
+  try {
+    await loadSlashCommands(client);
+  } catch (err) {
+    console.error("[ERROR] Failed loading interactions:", err.stack || err);
+  }
 
-client
-  .on("warn", console.warn)
-  .on("error", console.error)
-  .on("shardError", console.error);
+  client
+    .on("warn", console.warn)
+    .on("error", console.error)
+    .on("shardError", console.error);
 
-process
-  .on("uncaughtException", console.error)
-  .on("uncaughtExceptionMonitor", console.error)
-  .on("unhandledRejection", console.error);
+  process
+    .on("uncaughtException", err => {
+      console.error("[FATAL] uncaughtException:", err.stack || err);
+      // Optionally exit or notify
+    })
+    .on("uncaughtExceptionMonitor", err => console.error("[MONITOR]", err.stack || err))
+    .on("unhandledRejection", reason => console.error("[UNHANDLED REJECTION]", reason));
 
-client.login(TOKEN);
+  // login after loader finishes
+  client.login(TOKEN);
+})();
+

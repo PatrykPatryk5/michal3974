@@ -1,36 +1,34 @@
 const { glob } = require("glob");
 const handleButtons = require("./handleButtons");
+const logger = require("../logger");
 
 module.exports = async client => {
   const commandFiles = await glob(`${process.cwd()}/interactions/**/**/*.js`);
-  commandFiles.map(file => {
-    const command = require(file);
+  const commands = [];
 
-    if (!command?.data || !command?.execute)
-      throw new Error(
-        `[WARNING] The command at ${file} is missing a required "data" or "execute" property.`
-      );
+  for (const file of commandFiles) {
+    try {
+      const command = require(file);
 
-    client.interactions.set(command.data.name, command);
-  });
+      if (!command?.data || !command?.execute) {
+        logger.warn(
+          `The command at ${file} is missing a required "data" or "execute" property. Skipping.`
+        );
+        continue;
+      }
 
-  handleButtons(client);
+      client.interactions.set(command.data.name, command);
+      commands.push(command.data);
+    } catch (err) {
+      console.error(`[ERROR] Failed loading command file ${file}:`, err.stack || err);
+    }
+  }
 
-  // // contextMenus
-  // const contextMenus = await glob(`${process.cwd()}/interactions/contextMenus/*.js`);
-  // contextMenus.map(value => {
-  //   const file = require(value);
+  try {
+    await handleButtons(client);
+  } catch (err) {
+    logger.error("handleButtons failed:", err.stack || err);
+  }
 
-  //   if (!file?.data || !file?.execute) return console.log("coś nie tak");
-  //   client.contextMenus.set(file.data.name, file);
-  // });
-
-  // // modals
-  // const modals = await glob(`${process.cwd()}/interactions/modals/*.js`);
-  // modals.map(value => {
-  //   const file = require(value);
-
-  //   if (!file?.name) return console.log("coś nie tak");
-  //   client.modals.set(file.name, file);
-  // });
+  return commands;
 };

@@ -1,5 +1,22 @@
 const { REST, Routes } = require("discord.js");
-const { CLIENT_ID, GUILD_ID, TOKEN } = require("./config.json");
+let CLIENT_ID, GUILD_ID, TOKEN;
+try {
+  const cfg = require("./config.json");
+  CLIENT_ID = cfg.CLIENT_ID;
+  GUILD_ID = cfg.GUILD_ID;
+  TOKEN = cfg.TOKEN;
+} catch (err) {
+  // Fallback to environment variables if config.json is missing
+  CLIENT_ID = process.env.CLIENT_ID;
+  GUILD_ID = process.env.GUILD_ID;
+  TOKEN = process.env.TOKEN;
+  if (!CLIENT_ID || !TOKEN) {
+    console.error(
+      "config.json not found and required environment variables are missing (CLIENT_ID, TOKEN)."
+    );
+    process.exit(1);
+  }
+}
 const path = require("path");
 const { glob } = require("glob");
 

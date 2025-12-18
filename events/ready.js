@@ -9,45 +9,73 @@ module.exports = {
   name: "ready",
   once: true,
   async execute(client) {
-    console.log(
-      `${client.user.username} is online on ${client.guilds.cache.size} servers!`
-    );
+      const logger = require("../functions/logger");
+      logger.info(`${client.user.username} is online on ${client.guilds.cache.size} servers!`);
 
     // updateStats(client);
 
     // Set initial presence
-    updatePresence(client);
-
-    // Set interval to update presence every 1 minute
-    setInterval(() => {
+    try {
       updatePresence(client);
-    }, 60_000); // 1 minute in milliseconds
+      // Set interval to update presence every 1 minute
+      setInterval(() => updatePresence(client), 60_000);
+    } catch (err) {
+      logger.warn("Failed setting presence:", err.stack || err);
+    }
 
-    createDatabases(client);
-    createAudioPlayers(client);
-    await loadConfig(client);
+    try {
+      await Promise.resolve(createDatabases(client));
+    } catch (err) {
+      logger.error("createDatabases failed:", err.stack || err);
+    }
 
-    // const slash = client.slashCommands.map(k => k.data);
-    // const menu = client.contextMenus.map(k => k.data);
-    //   const array = [...slash, ...menu];
-    //   console.log(array.length);
-    //   await client.application.commands.set(array);
+    try {
+      await Promise.resolve(createAudioPlayers(client));
+    } catch (err) {
+      logger.error("createAudioPlayers failed:", err.stack || err);
+    }
+
+    try {
+      await loadConfig(client);
+    } catch (err) {
+      logger.error("loadConfig failed:", err.stack || err);
+    }
+
+    // Register application (/) commands from loaded interactions
+    try {
+      const slashCommands = [...client.interactions.values()]
+        .map(cmd => cmd?.data)
+        .filter(Boolean);
+
+      if (slashCommands.length > 0) {
+        await client.application.commands.set(slashCommands);
+        logger.info(`Registered ${slashCommands.length} application (/) commands.`);
+      } else {
+        logger.info("No slash commands found to register.");
+      }
+    } catch (err) {
+      logger.error("Failed registering application commands:", err.stack || err);
+    }
 
     // invites
     client.guilds.cache.forEach(async guild => {
       const clientMember = guild.members.cache.get(client.user.id);
 
       if (!clientMember.permissions.has(PermissionsBitField.Flags.ManageGuild))
-        return console.log(`no permissions to check invites in ${guild.name}`);
+        return logger.warn(`no permissions to check invites in ${guild.name}`);
 
-      const firstInvates = await guild.invites.fetch();
+      try {
+        const firstInvates = await guild.invites.fetch();
 
-      client.invites.set(
-        guild.id,
-        new Collection(firstInvates.map(invite => [invite.code, invite.uses]))
-      );
+        client.invites.set(
+          guild.id,
+          new Collection(firstInvates.map(invite => [invite.code, invite.uses]))
+        );
+      } catch (err) {
+        logger.error(`Failed fetching invites for ${guild.name}:`, err.stack || err);
+      }
     });
-    console.log("git");
+    logger.debug("ready complete");
   },
 };
 

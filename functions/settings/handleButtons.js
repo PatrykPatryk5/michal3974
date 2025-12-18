@@ -1,21 +1,28 @@
 const { glob } = require("glob");
+const logger = require("../logger");
 
 module.exports = async client => {
   try {
     // Grab all the command files from the buttons directory
     const buttonFiles = await glob(`${process.cwd()}/buttons/*.js`);
-    // slash commands
-    buttonFiles.map(file => {
-      const button = require(file);
+    // buttons
+    for (const file of buttonFiles) {
+      try {
+        const button = require(file);
 
-      if (!button?.data || !button?.execute)
-        throw new Error(
-          `[WARNING] The button at ${file} is missing a required "data" or "execute" property.`
-        );
+        if (!button?.data || !button?.execute) {
+          logger.warn(
+            `The button at ${file} is missing a required "data" or "execute" property. Skipping.`
+          );
+          continue;
+        }
 
-      client.buttons.set(button.data.name, button);
-    });
+        client.buttons.set(button.data.name, button);
+      } catch (err) {
+        logger.error(`Failed loading button file ${file}:`, err.stack || err);
+      }
+    }
   } catch (error) {
-    console.log(error);
+    logger.error(error.stack || error);
   }
 };
