@@ -105,7 +105,12 @@ async function notifyLive(client, liveUrl) {
 
   await sendEmbed(channel, {
     title: "TikTok LIVE",
-    description: `@${TIKTOK_USERNAME} jest LIVE. Wbijac!\n${liveUrl}`,
+    content: "@everyone",
+    description:
+      `@${TIKTOK_USERNAME} jest teraz na zywo!\n` +
+      `Wbijajcie od razu na transmisje:\n${liveUrl}\n\n` +
+      "Nie przegapcie startu live.",
+    footerText: "Automatyczne powiadomienie live",
     color: "tiktok",
   });
 }
