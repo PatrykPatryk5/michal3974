@@ -1,12 +1,16 @@
+const path = require("path");
 const { REST, Routes } = require("discord.js");
-let CLIENT_ID, GUILD_ID, TOKEN;
+const { glob } = require("glob");
+
+let CLIENT_ID;
+let GUILD_ID;
+let TOKEN;
 try {
   const cfg = require("./config.json");
   CLIENT_ID = cfg.CLIENT_ID;
   GUILD_ID = cfg.GUILD_ID;
   TOKEN = cfg.TOKEN;
 } catch (err) {
-  // Fallback to environment variables if config.json is missing
   CLIENT_ID = process.env.CLIENT_ID;
   GUILD_ID = process.env.GUILD_ID;
   TOKEN = process.env.TOKEN;
@@ -17,8 +21,6 @@ try {
     process.exit(1);
   }
 }
-const path = require("path");
-const { glob } = require("glob");
 
 // ##### CONFIG #####
 // ### production ###
@@ -35,33 +37,41 @@ const commands = [];
 // and deploy your commands!
 (async () => {
   try {
-    // Grab all the command files from the commands directory
-    const foldersPath = path.join(__dirname, "interactions");
+    const commandFiles = await glob("interactions/**/*.js", {
+      cwd: process.cwd(),
+      absolute: true,
+      nodir: true,
+      windowsPathsNoEscape: true,
+    });
 
-    const commandFiles = await glob(`${foldersPath}/**/**/*.js`);
-    if (!clearCommands)
-      // slash commands
-      commandFiles.map(file => {
+    if (!clearCommands) {
+      for (const file of commandFiles.sort()) {
         const command = require(file);
-        
-        if (!command?.data || !command?.execute)
-          throw new Error(
-            `[WARNING] The command at ${file} is missing a required "data" or "execute" property.`
+
+        if (!command?.data || typeof command?.execute !== "function") {
+          console.warn(
+            `[WARNING] Command ${path.relative(
+              process.cwd(),
+              file
+            )} is missing "data" or "execute". Skipping.`
           );
-        
+          continue;
+        }
+
         commands.push(command.data);
-      });
+      }
+    }
 
     console.log(
       `Started refreshing ${commands.length} application (/) commands.`
     );
-    console.log(commands.map(a=>a.name).join(", "));
+    console.log(commands.map(a => a.name).join(", "));
     
     // Construct and prepare an instance of the REST module
     const rest = new REST().setToken(TOKEN);
 
-    const route = registerGlobal 
-      ? Routes.applicationCommands(CLIENT_ID) 
+    const route = registerGlobal
+      ? Routes.applicationCommands(CLIENT_ID)
       : Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID);
 
     const data = await rest.put(route, { body: commands });
@@ -87,7 +97,6 @@ const commands = [];
       `Successfully reloaded ${data.length} application (/) commands.`
     );
   } catch (error) {
-    // And of course, make sure you catch and log any errors!
     console.error(error);
   }
 })();

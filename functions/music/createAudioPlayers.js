@@ -7,16 +7,12 @@ module.exports = async client => {
     client.guilds.cache.forEach(guild => {
       try {
         client.queue.set(guild.id, new ServerQueue());
-      } catch (err) {
-        logger.error(`Failed creating ServerQueue for ${guild.id}:`, err.stack || err);
-      }
-    });
-
-    client.guilds.cache.forEach(guild => {
-      try {
         client.radio.set(guild.id, new RadioQueue());
       } catch (err) {
-        logger.error(`Failed creating RadioQueue for ${guild.id}:`, err.stack || err);
+        logger.error(
+          `Failed creating queue state for guild ${guild.id}:`,
+          err.stack || err
+        );
       }
     });
   } catch (err) {

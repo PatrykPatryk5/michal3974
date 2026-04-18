@@ -5,24 +5,37 @@ module.exports = {
 
   async execute(interaction) {
     const { fields } = interaction;
-    console.log(fields);
-    
     const confirm = fields.getTextInputValue("confirm");
     const reason = fields.getTextInputValue("reason");
-    console.log(confirm, reason);
-    console.log("siema kto pl");
-    
-    if (confirm.toLowerCase() === "tak") {
-      member.timeout(28 * 24 * 60 * 60 * 1000, reason); // 28 days
-      // await interaction.reply({ embeds: [createEmbed("Komendy", content)] });
 
-      sendEmbed(interaction, {
-        description: `# ${member} dostał elegancką przerwę na 28 dni`,
+    const [, targetId] = String(interaction.customId || "").split(":");
+    if (!targetId) {
+      return sendEmbed(interaction, {
+        description:
+          "Nie mozna wykonac tej akcji: modal nie zawiera identyfikatora uzytkownika.",
+        color: "red",
+        ephemeral: true,
       });
-    } else
-      sendEmbed(interaction, {
-        description: `${member} niestety nie dostał eleganckiej przerwy na 28 dni ):`,
+    }
+
+    const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+    if (!member) {
+      return sendEmbed(interaction, {
+        description: "Nie znaleziono uzytkownika do nalozenia przerwy.",
+        color: "red",
+        ephemeral: true,
       });
-    console.log(confirm, reason);
+    }
+
+    if (confirm.toLowerCase() !== "tak") {
+      return sendEmbed(interaction, {
+        description: `${member} nie dostal przerwy.`,
+      });
+    }
+
+    await member.timeout(28 * 24 * 60 * 60 * 1000, reason || "Brak powodu");
+    return sendEmbed(interaction, {
+      description: `# ${member} dostal elegancka przerwe na 28 dni.`,
+    });
   },
 };

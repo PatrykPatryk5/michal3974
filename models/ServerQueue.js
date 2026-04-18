@@ -4,7 +4,7 @@ const sendEmbed = require("../functions/messages/sendEmbed");
 
 class ServerQueue {
   constructor() {
-    this.channel;
+    this.channel = null;
     this.queue = [];
     this.isPlaying = false;
     this.isLooping = false;
@@ -15,42 +15,59 @@ class ServerQueue {
     });
 
     this.player.on(AudioPlayerStatus.AutoPaused, () => {
-      console.log("muzyka zapałzowany!");
+      console.log("muzyka zapauzowana!");
     });
-    
+
     this.player.on(AudioPlayerStatus.Buffering, () => {
-      console.log("bufersuje muzyke!");
+      console.log("buforuje muzyke!");
     });
-    
+
     this.player.on(AudioPlayerStatus.Idle, async () => {
-      // get the url
-      const url = this.queue.shift()?.metadata?.url;
+      const finishedTrack = this.queue.shift();
+      const finishedUrl = finishedTrack?.metadata?.url;
 
-      // loop the url
-      this.isLooping && url && this.queue.unshift(await getResource(url));
-      
-      this.queue.length
-        // play the next song from the queue
-        ? this.player.play(this.queue[0])
-        // stop playing
-        : (this.isPlaying = false);
+      if (this.isLooping && finishedUrl) {
+        try {
+          const loopResources = await getResource(finishedUrl);
+          this.queue.unshift(...loopResources);
+        } catch (error) {
+          console.error("Loop reload failed:", error.message);
+        }
+      }
 
-      sendEmbed(this.channel, {
-        description: `🎵 piosenki w kolejce: ${this.queue.length}`,
-      });
+      if (this.queue.length) {
+        this.player.play(this.queue[0]);
+      } else {
+        this.isPlaying = false;
+      }
+
+      if (this.channel) {
+        sendEmbed(this.channel, {
+          description: `piosenki w kolejce: ${this.queue.length}`,
+        });
+      }
     });
 
     this.player.on("error", error => {
-      console.error(`Error: ${error.message} with resource ${error}`);
+      console.error(`Audio player error: ${error.message}`);
       this.queue.shift();
+
+      if (this.queue.length) {
+        this.player.play(this.queue[0]);
+      } else {
+        this.isPlaying = false;
+      }
     });
   }
 
   play() {
-    console.log("musica:",this.queue[0]);
+    if (!this.queue.length) {
+      this.isPlaying = false;
+      return;
+    }
+
     this.player.play(this.queue[0]);
     this.isPlaying = true;
-    console.log("gram");
   }
 }
 

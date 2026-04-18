@@ -4,6 +4,7 @@ const { PermissionsBitField, Collection } = require("discord.js");
 const createAudioPlayers = require("../functions/music/createAudioPlayers");
 const createDatabases = require("../functions/settings/createDatabases");
 const loadConfig = require("../functions/settings/loadConfig");
+const startTikTokLiveWatcher = require("../functions/social/startTikTokLiveWatcher");
 
 module.exports = {
   name: "ready",
@@ -39,6 +40,12 @@ module.exports = {
       await loadConfig(client);
     } catch (err) {
       logger.error("loadConfig failed:", err.stack || err);
+    }
+
+    try {
+      startTikTokLiveWatcher(client);
+    } catch (err) {
+      logger.error("startTikTokLiveWatcher failed:", err.stack || err);
     }
 
     // Register application (/) commands from loaded interactions
