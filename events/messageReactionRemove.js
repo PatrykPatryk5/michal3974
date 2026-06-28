@@ -2,7 +2,7 @@ const { Events } = require("discord.js");
 const handleStage1Reaction = require("../functions/applications/handleStage1Reaction");
 
 module.exports = {
-  name: Events.MessageReactionAdd,
+  name: Events.MessageReactionRemove,
   once: false,
   async execute(reaction, user, client) {
     if (user.bot) return;
@@ -18,9 +18,9 @@ module.exports = {
     }
 
     try {
-      await handleStage1Reaction(reaction, user, client, true);
+      await handleStage1Reaction(reaction, user, client, false);
     } catch (err) {
-      console.error("handleStage1Reaction failed:", err);
+      console.error("handleStage1Reaction (remove) failed:", err);
     }
   }
 };

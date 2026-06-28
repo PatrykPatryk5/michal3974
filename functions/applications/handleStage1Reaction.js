@@ -4,7 +4,7 @@ const logger = require("../logger");
 const updateStats = require("./updateStats");
 const moveToStage2 = require("./moveToStage2");
 
-module.exports = async (reaction, user, client) => {
+module.exports = async (reaction, user, client, isAdd = true) => {
   const targetChannelId = "1369740446674456576";
   const targetGuildId = "1315972381285548123";
   
@@ -29,21 +29,23 @@ module.exports = async (reaction, user, client) => {
 
   const hasRole = member.roles.cache.some(role => validRoles.includes(role.id));
 
-  // If user doesn't have permissions, remove reaction
+  // Jeśli użytkownik nie ma uprawnień
   if (!hasRole) {
-    try {
-      await reaction.users.remove(user.id);
-    } catch (e) {
-      // ignore
+    if (isAdd) {
+      try {
+        await reaction.users.remove(user.id);
+      } catch (e) {}
     }
     return;
   }
 
   const emoji = reaction.emoji.name;
   if (emoji !== "✅" && emoji !== "❌") {
-    try {
-      await reaction.users.remove(user.id);
-    } catch(e) {}
+    if (isAdd) {
+      try {
+        await reaction.users.remove(user.id);
+      } catch(e) {}
+    }
     return;
   }
 
@@ -61,53 +63,91 @@ module.exports = async (reaction, user, client) => {
     return;
   }
 
-  let voters = [];
+  // Wczytanie głosów jako słownik { "userId": true (✅) / false (❌) }
+  let voters = {};
   try {
-    voters = JSON.parse(application.stage1_voters || '[]');
+    const parsed = JSON.parse(application.stage1_voters || '{}');
+    if (Array.isArray(parsed)) {
+      voters = {}; // Migracja starego formatu - resetujemy w locie
+    } else {
+      voters = parsed;
+    }
   } catch(e) {}
 
-  if (voters.includes(user.id)) {
-    // User already voted, ignore subsequent reactions.
+  const isYes = emoji === "✅";
+
+  if (isAdd) {
+    // Jeśli dodaje głos
+    voters[user.id] = isYes;
+    
+    // Wizualne usunięcie przeciwnej reakcji, żeby nie miał dwóch na raz
     try {
-      await reaction.users.remove(user.id);
+      const oppositeEmoji = isYes ? "❌" : "✅";
+      const oppositeReaction = reaction.message.reactions.resolve(oppositeEmoji);
+      if (oppositeReaction) {
+        // Jeśli użytkownik ma tam reakcję, usuń ją (tylko z widoku, bo event MessageReactionRemove
+        // i tak się odpali, ale obsłuży to prawidłowo dzięki weryfikacji poniżej)
+        const hasOpposite = oppositeReaction.users.cache.has(user.id);
+        if (hasOpposite) {
+            await oppositeReaction.users.remove(user.id);
+        }
+      }
     } catch(e) {}
-    db.close();
-    return;
+
+  } else {
+    // Jeśli cofa głos
+    // Sprawdzamy czy wycofana reakcja zgadza się z jego aktualnym głosem.
+    // Dzięki temu, jeśli bot sam mu usunął starą reakcję przy zmianie zdania, nie usuniemy mu jego nowego głosu!
+    if (voters[user.id] === isYes) {
+      delete voters[user.id];
+    } else {
+      // Usunął inną reakcję niż jego aktualny głos, więc nic nie robimy w DB
+      db.close();
+      return;
+    }
   }
 
-  // Record the vote
-  voters.push(user.id);
-  const isYes = emoji === "✅";
-  const newYes = application.stage1_votes_yes + (isYes ? 1 : 0);
-  const newNo = application.stage1_votes_no + (!isYes ? 1 : 0);
-
-  db.prepare("UPDATE applications SET stage1_votes_yes = ?, stage1_votes_no = ?, stage1_voters = ? WHERE id = ?").run(
-    newYes,
-    newNo,
-    JSON.stringify(voters),
-    application.id
-  );
-
-  // Check if we reached >50% total votes
+  // Pobranie WSZYSTKICH aktualnych członków, żeby zweryfikować czy admini nadal mają role
   try {
     await guild.members.fetch();
   } catch (e) {}
 
   const eligibleMembers = guild.members.cache.filter(m => !m.user.bot && m.roles.cache.some(r => validRoles.includes(r.id)));
   const totalEligible = eligibleMembers.size;
-  const totalVotes = newYes + newNo;
+
+  let validYes = 0;
+  let validNo = 0;
+
+  // Przeliczamy na nowo TYLKO uprawnionych adminów
+  for (const [voterId, vote] of Object.entries(voters)) {
+    if (eligibleMembers.has(voterId)) {
+      if (vote === true) validYes++;
+      else if (vote === false) validNo++;
+    } else {
+      // Możemy tu opcjonalnie wyczyścić głosy byłych adminów
+      delete voters[voterId];
+    }
+  }
+
+  // Zapisz zaktualizowany stan do DB
+  db.prepare("UPDATE applications SET stage1_votes_yes = ?, stage1_votes_no = ?, stage1_voters = ? WHERE id = ?").run(
+    validYes,
+    validNo,
+    JSON.stringify(voters),
+    application.id
+  );
+
+  const totalVotes = validYes + validNo;
 
   if (totalEligible > 0 && totalVotes > totalEligible / 2) {
-    // Stage 1 finished!
-    const yesPercentage = newYes / totalVotes;
+    // Etap 1 zakończony!
+    const yesPercentage = validYes / totalVotes;
 
     if (yesPercentage >= 0.51) {
-      // Try atomic transition
       const res = db.prepare("UPDATE applications SET status = 'PENDING_STAGE_2' WHERE id = ? AND status = 'PENDING_STAGE_1'").run(application.id);
       db.close();
       
       if (res.changes > 0) {
-        // Clear reactions so people can't keep clicking
         try { await reaction.message.reactions.removeAll(); } catch(e) {}
         try { await reaction.message.reply("✅ To podanie pomyślnie przeszło do **Etapu 2** i zostało przekazane administracji."); } catch(e) {}
         
@@ -115,7 +155,6 @@ module.exports = async (reaction, user, client) => {
         await moveToStage2(application, reaction.message, client);
       }
     } else {
-      // Reject
       const res = db.prepare("UPDATE applications SET status = 'REJECTED' WHERE id = ? AND status = 'PENDING_STAGE_1'").run(application.id);
       db.close();
 

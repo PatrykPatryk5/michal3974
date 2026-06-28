@@ -28,6 +28,7 @@ const client = new Client({
   partials: [
     Partials.Channel,
     Partials.Message, // dm
+    Partials.Reaction,
   ],
 });
 

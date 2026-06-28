@@ -6,8 +6,13 @@ const updateStats = require("./updateStats");
 module.exports = async (interaction, client) => {
   const targetGuildId = "1315972381285548123";
   const { customId, user } = interaction;
+  
+  const stage2Roles = [
+    "1315972381411639372",
+    "1315972381411639366"
+  ];
 
-  // Expected ID: tak_stage2_123 or nie_stage2_123
+  // Oczekiwane ID: tak_stage2_123 lub nie_stage2_123
   const isYes = customId.startsWith("tak_");
   const appId = customId.split("_")[2];
 
@@ -26,42 +31,64 @@ module.exports = async (interaction, client) => {
     return interaction.reply({ content: "To podanie nie jest już w 2 etapie (zostało rozpatrzone).", ephemeral: true });
   }
 
-  // Sprawdzamy czy dany uzytkownik juz glosowal w stage 2
-  let voters = [];
+  // Wczytanie głosów z 2 etapu jako słownik { "userId": true / false }
+  let voters = {};
   try {
-    voters = JSON.parse(application.stage2_voters || '[]');
+    const parsed = JSON.parse(application.stage2_voters || '{}');
+    if (Array.isArray(parsed)) {
+      voters = {}; // Migracja
+    } else {
+      voters = parsed;
+    }
   } catch(e) {}
 
-  if (voters.includes(user.id)) {
+  if (voters[user.id] !== undefined && voters[user.id] === isYes) {
     db.close();
-    return interaction.reply({ content: "Już oddałeś głos w sprawie tego podania.", ephemeral: true });
+    return interaction.reply({ content: "Już oddałeś dokładnie taki sam głos.", ephemeral: true });
   }
 
-  voters.push(user.id);
-  const newYes = application.stage2_votes_yes + (isYes ? 1 : 0);
-  const newNo = application.stage2_votes_no + (!isYes ? 1 : 0);
+  voters[user.id] = isYes;
 
-  db.prepare("UPDATE applications SET stage2_votes_yes = ?, stage2_votes_no = ?, stage2_voters = ? WHERE id = ?").run(
-    newYes,
-    newNo,
+  const guild = client.guilds.cache.get(targetGuildId);
+  if (!guild) {
+    db.close();
+    return interaction.reply({ content: "Błąd serwera. Spróbuj ponownie.", ephemeral: true });
+  }
+
+  try {
+    await guild.members.fetch();
+  } catch (e) {}
+
+  const stage2Admins = guild.members.cache.filter(m => !m.user.bot && m.roles.cache.some(r => stage2Roles.includes(r.id)));
+  const totalAdmins = stage2Admins.size;
+
+  let validYes = 0;
+  let validNo = 0;
+
+  for (const [voterId, vote] of Object.entries(voters)) {
+    if (stage2Admins.has(voterId)) {
+      if (vote === true) validYes++;
+      else if (vote === false) validNo++;
+    } else {
+      delete voters[voterId];
+    }
+  }
+
+  db.prepare("UPDATE applications SET stage2_votes_yes = ?, stage2_votes_no = ?, stage2_voters = ?, stage2_total_admins = ? WHERE id = ?").run(
+    validYes,
+    validNo,
     JSON.stringify(voters),
+    totalAdmins,
     application.id
   );
 
-  await interaction.reply({ content: `Oddano głos na **${isYes ? "TAK" : "NIE"}**. Dziękujemy!`, ephemeral: true });
+  await interaction.reply({ content: `Zapisano głos na **${isYes ? "TAK" : "NIE"}**. Dziękujemy!`, ephemeral: true });
 
-  // Update button states on original message to disabled? We can't easily edit DM messages of others, but we can edit the one that triggered this interaction.
-  try {
-    await interaction.message.edit({ components: [] }); // Remove buttons for this user
-  } catch (e) {}
-
-  // Check if all admins have voted
-  const totalAdmins = application.stage2_total_admins || 0;
-  const totalVotes = newYes + newNo;
+  const totalVotes = validYes + validNo;
 
   if (totalAdmins > 0 && totalVotes >= totalAdmins) {
-    // Wszyscy zagłosowali
-    const yesPercentage = newYes / totalVotes;
+    // Wszyscy obecni i uprawnieni zagłosowali
+    const yesPercentage = validYes / totalVotes;
     
     const { EmbedBuilder } = require("discord.js");
     let finalStatus = 'REJECTED';
