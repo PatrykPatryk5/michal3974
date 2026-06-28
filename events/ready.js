@@ -48,6 +48,13 @@ module.exports = {
       logger.error("startTikTokLiveWatcher failed:", err.stack || err);
     }
 
+    try {
+      const initSystem = require("../functions/applications/initSystem");
+      await initSystem(client);
+    } catch (err) {
+      logger.error("initSystem failed:", err.stack || err);
+    }
+
     // Register application (/) commands from loaded interactions
     try {
       const slashCommands = [...client.interactions.values()]

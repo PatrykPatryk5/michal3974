@@ -23,6 +23,14 @@ module.exports = {
     //   .replace(/[\u0300-\u036f]/g, "")
     //   .toLowerCase();
 
+    // Handle applications system
+    try {
+      const handleNewApplication = require("../functions/applications/handleNewApplication");
+      await handleNewApplication(message, client);
+    } catch (err) {
+      console.error("handleNewApplication failed:", err);
+    }
+
     // //Check for PREFIX
     // if (cmd.includes("imie")) await reactOnRectutation(message);
   },

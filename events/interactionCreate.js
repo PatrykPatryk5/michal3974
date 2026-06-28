@@ -17,6 +17,14 @@ module.exports = {
 
         await command.execute(interaction);
       } else if (interaction.isButton()) {
+        const { customId } = interaction;
+        
+        if (customId.startsWith("tak_stage2_") || customId.startsWith("nie_stage2_")) {
+          const handleStage2Button = require("../functions/applications/handleStage2Button");
+          await handleStage2Button(interaction, client);
+          return;
+        }
+
         const button = client.buttons.get(customId);
 
         if (!button) throw new Error(`Nie znaleziono przycisku: ${customId}.`);

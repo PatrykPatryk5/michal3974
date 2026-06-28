@@ -25,6 +25,10 @@ module.exports = async client => {
       "CREATE TABLE IF NOT EXISTS task        (id    INTEGER PRIMARY KEY, user_id TEXT, date TEXT, content TEXT, additional_info TEXT)";
     const createTimeoutTable =
       "CREATE TABLE IF NOT EXISTS timeout     (id    INTEGER PRIMARY KEY AUTOINCREMENT, target_id TEXT, executor_id TEXT, reason TEXT, duration TEXT, action TEXT, timestamp INTEGER)";
+    const createApplicationsTable =
+      "CREATE TABLE IF NOT EXISTS applications (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, message_id TEXT, status TEXT, content TEXT, stage1_votes_yes INTEGER DEFAULT 0, stage1_votes_no INTEGER DEFAULT 0, stage1_voters TEXT DEFAULT '[]', stage2_votes_yes INTEGER DEFAULT 0, stage2_votes_no INTEGER DEFAULT 0, stage2_voters TEXT DEFAULT '[]', created_at INTEGER)";
+    const createApplicationsStatsTable =
+      "CREATE TABLE IF NOT EXISTS applications_stats (key TEXT PRIMARY KEY, value TEXT)";
 
     for (const db of databases) {
       try {
@@ -36,6 +40,13 @@ module.exports = async client => {
           db.prepare(createConfigTable).run();
           db.prepare(createTaskTable).run();
           db.prepare(createTimeoutTable).run();
+          db.prepare(createApplicationsTable).run();
+          db.prepare(createApplicationsStatsTable).run();
+          
+          try {
+            db.prepare("ALTER TABLE applications ADD COLUMN stage2_total_admins INTEGER DEFAULT 0").run();
+          } catch(e) {} // Ignore if column already exists
+
           return Promise.resolve();
         }, { retries: 3 });
       } catch (err) {
