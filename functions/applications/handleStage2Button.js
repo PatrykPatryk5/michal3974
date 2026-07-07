@@ -59,7 +59,8 @@ module.exports = async (interaction, client) => {
     await guild.members.fetch();
   } catch (e) {}
 
-  const stage2Admins = guild.members.cache.filter(m => !m.user.bot && m.roles.cache.some(r => stage2Roles.includes(r.id)));
+  const ignoredUsers = ["1328418865339826323", "1429430984348139552"];
+  const stage2Admins = guild.members.cache.filter(m => !m.user.bot && !ignoredUsers.includes(m.id) && m.roles.cache.some(r => stage2Roles.includes(r.id)));
   const totalAdmins = stage2Admins.size;
 
   let validYes = 0;

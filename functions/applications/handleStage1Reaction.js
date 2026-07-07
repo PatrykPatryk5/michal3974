@@ -40,7 +40,7 @@ module.exports = async (reaction, user, client, isAdd = true) => {
   }
 
   const emoji = reaction.emoji.name;
-  if (emoji !== "✅" && emoji !== "❌") {
+  if (emoji !== "✅" && emoji !== "❌" && emoji !== "❓") {
     if (isAdd) {
       try {
         await reaction.users.remove(user.id);
@@ -54,6 +54,59 @@ module.exports = async (reaction, user, client, isAdd = true) => {
 
   const application = db.prepare("SELECT * FROM applications WHERE message_id = ?").get(reaction.message.id);
   if (!application) {
+    db.close();
+    return;
+  }
+
+  if (emoji === "❓") {
+    if (isAdd) {
+      try { await reaction.users.remove(user.id); } catch(e) {}
+      
+      let info = `**Informacje o podaniu (ID: ${application.id})**\n`;
+      if (application.status === 'PENDING_STAGE_1') {
+        try { await guild.members.fetch(); } catch(e) {}
+        const ignoredUsers = ["1328418865339826323", "1429430984348139552"];
+        const eligibleMembers = guild.members.cache.filter(m => !m.user.bot && !ignoredUsers.includes(m.id) && m.roles.cache.some(r => validRoles.includes(r.id)));
+        const totalEligible = eligibleMembers.size;
+        const requiredVotes = Math.floor(totalEligible / 2) + 1;
+        
+        let vYes = 0;
+        let vNo = 0;
+        try {
+          const parsed = JSON.parse(application.stage1_voters || '{}');
+          for (const [vId, vVote] of Object.entries(parsed)) {
+            if (eligibleMembers.has(vId)) {
+              if (vVote === true) vYes++;
+              else if (vVote === false) vNo++;
+            }
+          }
+        } catch(e) {}
+        
+        const totalVotes = vYes + vNo;
+        const missingVotes = requiredVotes > totalVotes ? requiredVotes - totalVotes : 0;
+        
+        info += `Obecny etap: **Etap 1 (Głosowanie)**\n`;
+        info += `✅ Głosów za: **${vYes}**\n`;
+        info += `❌ Głosów przeciw: **${vNo}**\n`;
+        info += `Łącznie oddanych ważnych głosów: **${totalVotes} / ${totalEligible}** (wymaganych: **${requiredVotes}**)\n`;
+        if (missingVotes > 0) {
+          info += `Brakuje głosów do zakończenia etapu 1: **${missingVotes}**\n`;
+        } else {
+          info += `Wymagana liczba głosów została osiągnięta. Zaktualizuj swój głos by pchnąć system dalej.\n`;
+        }
+      } else if (application.status === 'PENDING_STAGE_2') {
+        info += `Obecny etap: **Etap 2 (Oczekujące na decyzję Zarządu)**\n`;
+      } else if (application.status === 'ACCEPTED') {
+        info += `Obecny etap: **ZAAKCEPTOWANE** ✅\n`;
+      } else if (application.status === 'REJECTED') {
+        info += `Obecny etap: **ODRZUCONE** ❌\n`;
+      }
+
+      try {
+        const msg = await reaction.message.channel.send({ content: `<@${user.id}> \n${info}` });
+        setTimeout(() => msg.delete().catch(() => {}), 15000);
+      } catch(e) {}
+    }
     db.close();
     return;
   }
@@ -112,7 +165,8 @@ module.exports = async (reaction, user, client, isAdd = true) => {
     await guild.members.fetch();
   } catch (e) {}
 
-  const eligibleMembers = guild.members.cache.filter(m => !m.user.bot && m.roles.cache.some(r => validRoles.includes(r.id)));
+  const ignoredUsers = ["1328418865339826323", "1429430984348139552"];
+  const eligibleMembers = guild.members.cache.filter(m => !m.user.bot && !ignoredUsers.includes(m.id) && m.roles.cache.some(r => validRoles.includes(r.id)));
   const totalEligible = eligibleMembers.size;
 
   let validYes = 0;

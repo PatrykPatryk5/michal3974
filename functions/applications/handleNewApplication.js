@@ -76,6 +76,7 @@ module.exports = async (message, client) => {
     try {
       await message.react("✅");
       await message.react("❌");
+      await message.react("❓");
     } catch (e) {
       logger.error("Could not add reactions to new application:", e);
     }
