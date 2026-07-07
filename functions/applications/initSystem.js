@@ -88,6 +88,35 @@ module.exports = async (client) => {
     const updateStats = require("./updateStats");
     await updateStats(client, targetGuildId);
 
+    // Dodaj brakujące reakcje ❓ do starszych podań i wyślij zaległe DMy z Etapu 2
+    try {
+      const pendingApps = db.prepare("SELECT * FROM applications WHERE status = 'PENDING_STAGE_1'").all();
+      for (const app of pendingApps) {
+        try {
+          const msg = await channel.messages.fetch(app.message_id);
+          if (msg) {
+            const hasQuestionMark = msg.reactions.cache.has('❓');
+            if (!hasQuestionMark) {
+              await msg.react('❓');
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Napraw zablokowane podania w Etapie 2, do których nie wysłano DM
+      const stuckStage2Apps = db.prepare("SELECT * FROM applications WHERE status = 'PENDING_STAGE_2' AND stage2_total_admins = 0").all();
+      if (stuckStage2Apps.length > 0) {
+        const moveToStage2 = require("./moveToStage2");
+        const fakeMessage = { guild: guild }; // moveToStage2 expects an object with .guild
+        for (const app of stuckStage2Apps) {
+          logger.info(`[Podania] Resending Stage 2 DMs for stuck application ID: ${app.id}`);
+          await moveToStage2(app, fakeMessage, client);
+        }
+      }
+    } catch (e) {
+      logger.error("Error fixing pending applications:", e);
+    }
+
   } catch (err) {
     logger.error("initSystem applications error:", err.stack || err);
   }

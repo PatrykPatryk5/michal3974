@@ -17,6 +17,7 @@ module.exports = async (reaction, user, client, isAdd = true) => {
     "1315972381411639369"
   ];
 
+  client = client || reaction.message.client;
   const guild = reaction.message.guild;
   if (!guild) return;
 
