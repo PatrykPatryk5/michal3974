@@ -97,6 +97,22 @@ module.exports = async (message, client) => {
     
     // Update stats
     await updateStats(client, targetGuildId);
+
+    // Ghost ping admin roles
+    const validRoles = [
+      "1315972381411639372",
+      "1315972381411639366",
+      "1315972381411639370",
+      "1315972381411639369"
+    ];
+    const pingContent = validRoles.map(id => `<@&${id}>`).join(" ") + " **Nowe podanie wpłynęło!**";
+    try {
+      const pingMsg = await message.channel.send({ content: pingContent });
+      setTimeout(() => pingMsg.delete().catch(() => {}), 5000);
+    } catch (e) {
+      logger.error("Could not send ghost ping:", e);
+    }
+
   } catch (err) {
     logger.error("Error saving application:", err.stack || err);
   } finally {

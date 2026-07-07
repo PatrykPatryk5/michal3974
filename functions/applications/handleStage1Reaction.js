@@ -27,7 +27,7 @@ module.exports = async (reaction, user, client, isAdd = true) => {
     return;
   }
 
-  const hasRole = member.roles.cache.some(role => validRoles.includes(role.id));
+  const hasRole = member.roles.cache.some(role => validRoles.includes(role.id)) || member.id === guild.ownerId;
 
   // Jeśli użytkownik nie ma uprawnień
   if (!hasRole) {
@@ -66,7 +66,7 @@ module.exports = async (reaction, user, client, isAdd = true) => {
       if (application.status === 'PENDING_STAGE_1') {
         try { await guild.members.fetch(); } catch(e) {}
         const ignoredUsers = ["1328418865339826323", "1429430984348139552"];
-        const eligibleMembers = guild.members.cache.filter(m => !m.user.bot && !ignoredUsers.includes(m.id) && m.roles.cache.some(r => validRoles.includes(r.id)));
+        const eligibleMembers = guild.members.cache.filter(m => !m.user.bot && !ignoredUsers.includes(m.id) && (m.roles.cache.some(r => validRoles.includes(r.id)) || m.id === guild.ownerId));
         const totalEligible = eligibleMembers.size;
         const requiredVotes = Math.floor(totalEligible / 2) + 1;
         
@@ -89,6 +89,9 @@ module.exports = async (reaction, user, client, isAdd = true) => {
         info += `✅ Głosów za: **${vYes}**\n`;
         info += `❌ Głosów przeciw: **${vNo}**\n`;
         info += `Łącznie oddanych ważnych głosów: **${totalVotes} / ${totalEligible}** (wymaganych: **${requiredVotes}**)\n`;
+        
+        const eligibleNames = eligibleMembers.map(m => m.user.username).join(", ");
+        info += `👥 Uprawnieni użytkownicy: ${eligibleNames}\n`;
         if (missingVotes > 0) {
           info += `Brakuje głosów do zakończenia etapu 1: **${missingVotes}**\n`;
         } else {
@@ -166,7 +169,7 @@ module.exports = async (reaction, user, client, isAdd = true) => {
   } catch (e) {}
 
   const ignoredUsers = ["1328418865339826323", "1429430984348139552"];
-  const eligibleMembers = guild.members.cache.filter(m => !m.user.bot && !ignoredUsers.includes(m.id) && m.roles.cache.some(r => validRoles.includes(r.id)));
+  const eligibleMembers = guild.members.cache.filter(m => !m.user.bot && !ignoredUsers.includes(m.id) && (m.roles.cache.some(r => validRoles.includes(r.id)) || m.id === guild.ownerId));
   const totalEligible = eligibleMembers.size;
 
   let validYes = 0;
