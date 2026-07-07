@@ -81,13 +81,6 @@ module.exports = async (client) => {
       db.prepare("INSERT OR REPLACE INTO applications_stats (key, value) VALUES (?, ?)").run("stats_channel_id", targetChannelId);
       logger.info("[Podania] Created new stats embed.");
     }
-    
-    db.close();
-
-    // Call updateStats immediately to refresh values
-    const updateStats = require("./updateStats");
-    await updateStats(client, targetGuildId);
-
     // Dodaj brakujące reakcje ❓ do starszych podań i wyślij zaległe DMy z Etapu 2
     try {
       const pendingApps = db.prepare("SELECT * FROM applications WHERE status = 'PENDING_STAGE_1'").all();
@@ -116,6 +109,12 @@ module.exports = async (client) => {
     } catch (e) {
       logger.error("Error fixing pending applications:", e);
     }
+    
+    db.close();
+
+    // Call updateStats immediately to refresh values
+    const updateStats = require("./updateStats");
+    await updateStats(client, targetGuildId);
 
   } catch (err) {
     logger.error("initSystem applications error:", err.stack || err);
