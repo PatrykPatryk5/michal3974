@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
-    "@distube/ytdl-core": "^4.16.12",
+    "@distube/ytdl-core": "^5.0.0",
     "@napi-rs/canvas": "^0.1.100",
     "axios": "^1.18.1",
     "better-sqlite3": "^12.11.1",
